@@ -1,0 +1,6 @@
+{
+  "name": "Car Value Coach",
+  "description": "차량 주행 데이터 기반 맞춤형 코칭과 투명한 정비·관리 이력 리포트 AI 에이전트",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

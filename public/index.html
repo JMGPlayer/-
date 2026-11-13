@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Car Value Coach - 최신 APK 즉시 다운로드</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(135deg, #0a192f 0%, #172a45 100%);
+      color: #0f172a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+    .card {
+      background: #ffffff;
+      max-width: 540px;
+      width: 100%;
+      border-radius: 28px;
+      padding: 36px 28px;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      text-align: center;
+      position: relative;
+    }
+    .badge-row {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 14px;
+      background: #eef4ff;
+      color: #1e60f2;
+      font-size: 12.5px;
+      font-weight: 700;
+      border-radius: 20px;
+      border: 1px solid #cce0ff;
+    }
+    .badge.green {
+      background: #ecfdf5;
+      color: #059669;
+      border-color: #a7f3d0;
+    }
+    .icon-container {
+      width: 84px;
+      height: 84px;
+      background: #12314E;
+      border-radius: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      margin-bottom: 16px;
+      box-shadow: 0 10px 22px rgba(18, 49, 78, 0.35);
+    }
+    .icon-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    h1 {
+      font-size: 26px;
+      font-weight: 800;
+      color: #0a192f;
+      margin-bottom: 6px;
+      letter-spacing: -0.5px;
+    }
+    .subtitle {
+      font-size: 14.5px;
+      color: #475569;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    .btn-download-primary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      background: linear-gradient(135deg, #1e60f2 0%, #154ecc 100%);
+      color: #ffffff;
+      text-decoration: none;
+      padding: 20px 24px;
+      border-radius: 18px;
+      font-weight: 800;
+      font-size: 18px;
+      box-shadow: 0 10px 25px rgba(30, 96, 242, 0.4);
+      transition: all 0.2s ease-in-out;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-download-primary:hover {
+      background: linear-gradient(135deg, #154ecc 0%, #0d3ba8 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 14px 28px rgba(30, 96, 242, 0.5);
+    }
+    .btn-download-primary:active {
+      transform: translateY(0);
+    }
+    .file-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 18px;
+      margin-bottom: 22px;
+    }
+    .meta-item {
+      background: #f8fafc;
+      padding: 10px 8px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+    }
+    .meta-label {
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 2px;
+    }
+    .meta-val {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .direct-link-box {
+      background: #f1f5f9;
+      border: 1px dashed #cbd5e1;
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    .direct-link-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #475569;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .copy-btn {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #1e60f2;
+      cursor: pointer;
+    }
+    .copy-btn:hover {
+      background: #eef4ff;
+    }
+    .direct-link-code {
+      font-family: monospace;
+      font-size: 12px;
+      color: #0f172a;
+      word-break: break-all;
+      display: block;
+      background: #ffffff;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+    }
+    .compatibility-box {
+      padding: 14px 16px;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      border-radius: 14px;
+      text-align: left;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .compatibility-box .check-icon {
+      font-size: 20px;
+      line-height: 1.2;
+    }
+    .compatibility-text {
+      font-size: 13px;
+      color: #047857;
+      line-height: 1.5;
+    }
+    .compatibility-text strong {
+      color: #065f46;
+      font-weight: 700;
+    }
+    .instructions {
+      padding: 18px;
+      background: #f8fafd;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      text-align: left;
+      font-size: 13px;
+      color: #334155;
+      line-height: 1.7;
+    }
+    .instructions h3 {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: #0a192f;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .instructions ol {
+      padding-left: 20px;
+    }
+    .instructions li {
+      margin-bottom: 6px;
+    }
+    .instructions em {
+      font-style: normal;
+      font-weight: 700;
+      color: #1e60f2;
+    }
+    .footer-note {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge-row">
+      <div class="badge">🚀 최신 빌드 v1.5 (vCode 6)</div>
+      <div class="badge green">🛡️ Galaxy S21 최적화 빌드</div>
+    </div>
+    
+    <div class="icon-container">
+      <img src="/app-icon.png" alt="Car Value Coach 앱 아이콘">
+    </div>
+    <h1>Car Value Coach</h1>
+    <p class="subtitle">차량 데이터 기반 주행 코칭 & 투명 정비 이력 앱<br>상단 헤더 잘림 해결, 컴팩트 로그인 알림 및 신규 엠블럼 아이콘이 적용된 최종 버전입니다.</p>
+
+    <!-- 원클릭 직접 다운로드 버튼 (APK) -->
+    <a href="/CarValueCoach_v1.5.apk" download="CarValueCoach_v1.5.apk" id="downloadBtn" class="btn-download-primary">
+      <span>📥</span>
+      <span>최신 APK 바로 다운로드 (18.0 MB)</span>
+    </a>
+
+    <div style="height: 10px;"></div>
+
+    <!-- 원클릭 ZIP 다운로드 버튼 -->
+    <a href="/CarValueCoach_v1.5.zip" download="CarValueCoach_v1.5.zip" class="btn-download-primary" style="background: linear-gradient(135deg, #0a192f 0%, #1e293b 100%); box-shadow: 0 8px 20px rgba(10, 25, 47, 0.25); padding: 15px 20px; font-size: 15px;">
+      <span>📦</span>
+      <span>ZIP 압축 파일로 다운로드 (17.5 MB)</span>
+    </a>
+
+    <!-- 메타데이터 그리드 -->
+    <div class="file-meta-grid">
+      <div class="meta-item">
+        <div class="meta-label">파일명</div>
+        <div class="meta-val">CarValueCoach_v1.5.apk</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">버전</div>
+        <div class="meta-val">v1.5 (Code 6)</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">지원 기기</div>
+        <div class="meta-val">Android 10 ~ 15</div>
+      </div>
+    </div>
+
+    <!-- 직접 URL 복사 박스 -->
+    <div class="direct-link-box">
+      <div class="direct-link-title">
+        <span>🔗 브라우저 직접 다운로드 링크</span>
+        <button class="copy-btn" onclick="copyDirectUrl()">URL 복사</button>
+      </div>
+      <code class="direct-link-code" id="directUrl"></code>
+    </div>
+
+    <!-- 호환성 안내 -->
+    <div class="compatibility-box">
+      <span class="check-icon">✅</span>
+      <div class="compatibility-text">
+        <strong>삼성 갤럭시 S21 및 최신 기종 완벽 호환</strong><br>
+        상단 제목·부제 전체 노출, 하단 컴팩트 로그인 안내 배너, 세련된 하이브리드 세단·인증 배지 앱 아이콘이 최종 반영되었습니다.
+      </div>
+    </div>
+
+    <!-- 간편 설치 가이드 -->
+    <div class="instructions">
+      <h3>📱 갤럭시/안드로이드 설치 가이드 (3단계)</h3>
+      <ol>
+        <li>상단의 <em>[최신 APK 바로 다운로드]</em> 또는 <em>[ZIP 압축 파일]</em> 버튼을 터치하여 다운로드합니다.</li>
+        <li>알림창 또는 <em>'내 파일' 앱 > '다운로드'</em>에서 <strong>CarValueCoach_v1.5.apk</strong>를 실행합니다.</li>
+        <li><em>'출처를 알 수 없는 앱 설치'</em> 안내 시 <em>[허용]</em>을 누르고 <em>[설치]</em>를 누르면 완료됩니다.</li>
+      </ol>
+    </div>
+
+    <div class="footer-note">
+      Car Value Coach v1.5 · Ready for Galaxy S21
+    </div>
+  </div>
+
+  <script>
+    const directUrl = window.location.origin + '/CarValueCoach_v1.5.apk';
+    document.getElementById('directUrl').textContent = directUrl;
+
+    function copyDirectUrl() {
+      navigator.clipboard.writeText(directUrl).then(function() {
+        alert('다운로드 링크가 클립보드에 복사되었습니다!\n' + directUrl);
+      }).catch(function() {
+        const input = document.createElement('input');
+        input.value = directUrl;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        alert('다운로드 링크가 복사되었습니다!');
+      });
+    }
+  </script>
+</body>
+</html>

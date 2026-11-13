@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Car Value Coach</string>
+    <string name="nav_home">홈·주행</string>
+    <string name="nav_coaching">주행·코칭</string>
+    <string name="nav_maintenance">정비·증빙</string>
+    <string name="nav_report">가치 리포트</string>
+</resources>
