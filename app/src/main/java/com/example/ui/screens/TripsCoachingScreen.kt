@@ -32,7 +32,7 @@ import com.example.ui.components.StatusChip
 import com.example.ui.theme.*
 
 @Composable
-fun TripsCoachingScreen(
+fun DemoTripsCoachingScreen(
     sessions: List<DrivingSession>,
     coachingGoals: List<CoachingGoal>,
     activeFilter: String,
@@ -512,7 +512,7 @@ fun TripsCoachingScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Vehicle SDK",
+                                text = "예시 데이터",
                                 style = MaterialTheme.typography.titleSmall.copy(
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 12.sp,

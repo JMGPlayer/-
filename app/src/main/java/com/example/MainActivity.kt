@@ -38,6 +38,15 @@ import com.example.ui.screens.ValueReportScreen
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.AppTab
 import com.example.ui.viewmodel.CarValueViewModel
+import android.util.Log
+import ai.pleos.playground.vehicle.Vehicle
+import ai.pleos.playground.vehicle.api.model.area.DoorArea
+import ai.pleos.playground.vehicle.constant.area.DoorValue
+import ai.pleos.playground.vehicle.listener.DistanceDrivenListener
+import android.car.Car
+import android.car.VehiclePropertyIds
+import android.car.hardware.CarPropertyValue
+import android.car.hardware.property.CarPropertyManager
 
 private const val PREFS_NAME = "car_value_coach_prefs"
 private const val KEY_DARK_MODE = "is_dark_mode"
@@ -73,16 +82,646 @@ private fun saveAppSettings(context: Context, settings: AppSettings) {
 
 class MainActivity : ComponentActivity() {
 
+    private val recordNotificationPermissionLauncher =
+        registerForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            if (granted) {
+                startDrivingRecordService()
+            } else {
+                android.widget.Toast.makeText(
+                    this,
+                    "이번 테스트는 알림 권한을 허용한 뒤 시작해 주세요.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+
+    private fun requestDrivingRecordStart() {
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                this,
+                "android.permission.POST_NOTIFICATIONS"
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            recordNotificationPermissionLauncher.launch(
+                "android.permission.POST_NOTIFICATIONS"
+            )
+        } else {
+            startDrivingRecordService()
+        }
+    }
+
+    private fun startDrivingRecordService() {
+        androidx.core.content.ContextCompat.startForegroundService(
+            this,
+            android.content.Intent(
+                this,
+                DrivingRecordService::class.java
+            )
+        )
+    }
+
+    private val speedStatus =
+        androidx.compose.runtime.mutableStateOf("현재 속도: 연결 전")
+
+    private var speedCar: Car? = null
+    private var speedManager: CarPropertyManager? = null
+    private var speedCallback:
+            CarPropertyManager.CarPropertyEventCallback? = null
+
+    private var speedSession = 0
+
+    private fun startSpeedUpdates() {
+        if (speedCar != null) return
+
+        val permission = "android.car.permission.CAR_SPEED"
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                this,
+                permission
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            speedStatus.value = "현재 속도: 접근 권한이 필요합니다."
+            return
+        }
+
+        if (!packageManager.hasSystemFeature(
+                android.content.pm.PackageManager.FEATURE_AUTOMOTIVE
+            )
+        ) {
+            speedStatus.value = "현재 속도: 차량용 환경에서 확인해 주세요."
+            return
+        }
+
+        val session = ++speedSession
+        speedStatus.value = "현재 속도: 차량 서비스 연결 중…"
+
+        try {
+            speedCar = Car.createCar(
+                this,
+                android.os.Handler(android.os.Looper.getMainLooper()),
+                Car.CAR_WAIT_TIMEOUT_DO_NOT_WAIT
+            ) { car, ready ->
+                if (session != speedSession || isDestroyed || isFinishing) {
+                    return@createCar
+                }
+
+                if (!ready) {
+                    speedManager = null
+                    speedCallback = null
+                    speedStatus.value = "현재 속도: 차량 서비스 연결 끊김"
+                    return@createCar
+                }
+
+                try {
+                    val manager =
+                        car.getCarManager(Car.PROPERTY_SERVICE)
+                                as CarPropertyManager
+
+                    val callback = object :
+                        CarPropertyManager.CarPropertyEventCallback {
+
+                        override fun onChangeEvent(
+                            value: CarPropertyValue<*>
+                        ) {
+                            if (session != speedSession ||
+                                isDestroyed || isFinishing
+                            ) return
+
+                            if (value.propertyId !=
+                                VehiclePropertyIds.PERF_VEHICLE_SPEED
+                            ) return
+
+                            val metersPerSecond = value.value as? Float
+
+                            if (value.status !=
+                                CarPropertyValue.STATUS_AVAILABLE ||
+                                metersPerSecond == null ||
+                                !metersPerSecond.isFinite()
+                            ) {
+                                speedStatus.value =
+                                    "현재 속도: 유효한 데이터가 없습니다."
+                                return
+                            }
+
+                            val kmh = kotlin.math.abs(metersPerSecond) * 3.6f
+                            val direction =
+                                if (metersPerSecond < 0f) " (후진)" else ""
+
+                            speedStatus.value = String.format(
+                                java.util.Locale.KOREA,
+                                "현재 속도: %.1f km/h%s",
+                                kmh,
+                                direction
+                            )
+                        }
+
+                        override fun onErrorEvent(
+                            propertyId: Int,
+                            areaId: Int
+                        ) {
+                            if (session != speedSession) return
+
+                            if (propertyId ==
+                                VehiclePropertyIds.PERF_VEHICLE_SPEED
+                            ) {
+                                speedStatus.value = "현재 속도: 수신 오류"
+                                Log.w("PleosTest", "속도 수신 오류")
+                            }
+                        }
+                    }
+
+                    speedManager = manager
+                    speedCallback = callback
+                    speedStatus.value = "현재 속도: 데이터 수신 대기 중…"
+
+                    val registered = manager.registerCallback(
+                        callback,
+                        VehiclePropertyIds.PERF_VEHICLE_SPEED,
+                        2f
+                    )
+
+                    if (!registered) {
+                        speedStatus.value =
+                            "현재 속도: 이 환경에서 속도 수신을 등록하지 못했습니다."
+                    }
+
+                    Log.i("PleosTest", "속도 수신 등록 결과: $registered")
+                } catch (e: Exception) {
+                    speedStatus.value = "속도 연결 실패: ${e.message}"
+                    Log.e("PleosTest", "속도 연결 실패", e)
+                }
+            }
+        } catch (e: Exception) {
+            speedStatus.value = "속도 서비스 연결 실패: ${e.message}"
+            Log.e("PleosTest", "속도 서비스 연결 실패", e)
+            stopSpeedUpdates()
+        }
+    }
+
+    private fun stopSpeedUpdates() {
+        speedSession++
+
+        try {
+            speedCallback?.let { callback ->
+                speedManager?.unregisterCallback(callback)
+            }
+        } catch (e: Exception) {
+            Log.w("PleosTest", "속도 수신 해제 실패", e)
+        }
+
+        try {
+            speedCar?.disconnect()
+        } catch (e: Exception) {
+            Log.w("PleosTest", "속도 서비스 연결 해제 실패", e)
+        }
+
+        speedCallback = null
+        speedManager = null
+        speedCar = null
+        speedStatus.value = "현재 속도: 수신 중지"
+    }
+
+    private val speedPermissionStatus =
+        androidx.compose.runtime.mutableStateOf(
+            "속도 정보를 읽으려면 권한을 허용해 주세요."
+        )
+
+    private val speedPermissionLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        speedPermissionStatus.value = if (granted) {
+            "속도 접근 권한이 허용되었습니다."
+        } else {
+            "속도 접근 권한이 허용되지 않았습니다."
+        }
+
+        Log.i("PleosTest", speedPermissionStatus.value)
+    }
+
+    private fun requestSpeedPermission() {
+        val permission = "android.car.permission.CAR_SPEED"
+
+        if (
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                this,
+                permission
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            speedPermissionStatus.value =
+                "속도 접근 권한이 이미 허용되어 있습니다."
+        } else {
+            speedPermissionLauncher.launch(permission)
+        }
+    }
+
     private val viewModel: CarValueViewModel by viewModels()
+    private var pleosVehicle: Vehicle? = null
+    private var mileageUpdatesActive = false
+
+    private val mileageListener = object : DistanceDrivenListener {
+        override fun onDistanceDrivenUpdated(value: Float?) {
+            runOnUiThread {
+                if (!mileageUpdatesActive || isDestroyed || isFinishing) {
+                    return@runOnUiThread
+                }
+
+                if (value == null || !value.isFinite() || value < 0f ||
+                    value.toDouble() > Int.MAX_VALUE.toDouble()
+                ) {
+                    mileageStatus.value =
+                        "자동 갱신: 유효한 값이 없습니다. 차량 카드는 마지막 값을 유지합니다."
+                    return@runOnUiThread
+                }
+
+                savePleosMileage(value)
+
+                val formattedKm = String.format(
+                    java.util.Locale.KOREA,
+                    "%,.1f",
+                    value
+                )
+                val updatedAt = java.text.SimpleDateFormat(
+                    "HH:mm:ss",
+                    java.util.Locale.KOREA
+                ).format(java.util.Date())
+
+                mileageStatus.value =
+                    "누적 주행거리: $formattedKm km\n자동 수신: $updatedAt"
+
+                Log.i("PleosTest", "주행거리 자동 수신: $value km")
+            }
+        }
+
+        override fun onFailed(e: Exception) {
+            Log.e("PleosTest", "주행거리 자동 수신 실패", e)
+
+            runOnUiThread {
+                if (mileageUpdatesActive && !isDestroyed && !isFinishing) {
+                    mileageStatus.value =
+                        "자동 수신 실패: ${e.message ?: e.javaClass.simpleName}\n" +
+                                "차량 카드는 마지막 값을 유지합니다."
+                }
+            }
+        }
+    }
+    private val mileageStatus = androidx.compose.runtime.mutableStateOf(
+        "누적 주행거리: 아직 조회하지 않았습니다."
+    )
+    private val isMileageReading = androidx.compose.runtime.mutableStateOf(false)
+
+    private val doorStatus = androidx.compose.runtime.mutableStateOf(
+        "아직 조회하지 않았습니다."
+    )
+    private val isReading = androidx.compose.runtime.mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        restorePleosMileage()
+
         setContent {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
             MyApplicationTheme(darkTheme = uiState.appSettings.isDarkMode) {
-                CarValueCoachApp(viewModel = viewModel)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .safeDrawingPadding()
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Text(
+                                text = "Pleos 연결 테스트",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = mileageStatus.value,
+                                fontSize = 24.sp
+                            )
+
+                            Button(
+                                onClick = { readPleosMileage() },
+                                enabled = !isMileageReading.value,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 64.dp)
+                            ) {
+                                Text(
+                                    text = if (isMileageReading.value) {
+                                        "주행거리 조회 중…"
+                                    } else {
+                                        "주행거리 다시 읽기"
+                                    },
+                                    fontSize = 22.sp
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                text = speedPermissionStatus.value,
+                                fontSize = 20.sp
+                            )
+
+                            Button(
+                                onClick = { requestSpeedPermission() },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 56.dp)
+                            ) {
+                                Text(
+                                    text = "속도 접근 허용",
+                                    fontSize = 22.sp
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = speedStatus.value,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = { requestDrivingRecordStart() }
+                                ) {
+                                    Text("기록 시작")
+                                }
+
+                                Button(
+                                    onClick = {
+                                        startService(
+                                            android.content.Intent(
+                                                this@MainActivity,
+                                                DrivingRecordService::class.java
+                                            ).setAction("STOP_RECORDING")
+                                        )
+                                    }
+                                ) {
+                                    Text("기록 종료")
+                                }
+                            }
+
+                            DrivingRecordPanel()
+
+                            Text(text = doorStatus.value)
+
+                            Button(
+                                onClick = { readPleosDoor() },
+                                enabled = !isReading.value
+                            ) {
+                                Text(
+                                    if (isReading.value) "조회 중…"
+                                    else "문 상태 다시 읽기"
+                                )
+                            }
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    ) {
+                        CarValueCoachApp(viewModel = viewModel)
+                    }
+                }
             }
+        }
+
+        readPleosDoor()
+    }
+
+    private fun readPleosDoor() {
+        if (isReading.value) return
+
+        isReading.value = true
+        doorStatus.value = "에뮬레이터의 문 위치를 조회하고 있습니다."
+
+        try {
+            val vehicle = pleosVehicle ?: Vehicle(this).also {
+                pleosVehicle = it
+                it.initialize()
+            }
+
+            Log.i("PleosTest", "문 상태 조회 요청")
+
+            vehicle.getDoor().getCurrentDoorPosition(
+                area = DoorArea(DoorValue.ROW_1_LEFT),
+                onComplete = { position ->
+                    val message = if (position == null) {
+                        "응답은 왔지만 문 위치 값이 없습니다."
+                    } else {
+                        "앞좌석 왼쪽 문 위치 값: $position"
+                    }
+
+                    Log.i("PleosTest", message)
+                    showDoorResult(message)
+                },
+                onFailed = { error ->
+                    Log.e("PleosTest", "문 상태 조회 실패", error)
+                    showDoorResult(
+                        "조회 실패: ${error.message ?: error.javaClass.simpleName}"
+                    )
+                }
+            )
+        } catch (error: Exception) {
+            Log.e("PleosTest", "SDK 연결 또는 조회 요청 실패", error)
+            showDoorResult(
+                "연결 또는 조회 실패: ${error.message ?: error.javaClass.simpleName}"
+            )
+        }
+    }
+
+    private fun showDoorResult(message: String) {
+        runOnUiThread {
+            if (!isDestroyed && !isFinishing) {
+                doorStatus.value = message
+                isReading.value = false
+            }
+        }
+    }
+
+    private fun readPleosMileage() {
+        if (isMileageReading.value) return
+
+        isMileageReading.value = true
+        mileageStatus.value = "누적 주행거리 조회 중…"
+
+        try {
+            val vehicle = pleosVehicle ?: Vehicle(this).also {
+                pleosVehicle = it
+                it.initialize()
+            }
+
+            Log.i("PleosTest", "누적 주행거리 조회 요청")
+
+            vehicle.getOdometer().getCurrentDistanceDriven(
+                onComplete = { km ->
+                    if (km != null && km.isFinite() && km >= 0f &&
+                        km.toDouble() <= Int.MAX_VALUE.toDouble()
+                    ) {
+                        runOnUiThread {
+                            if (!isDestroyed && !isFinishing) {
+                                savePleosMileage(km)
+                            }
+                        }
+                    }
+                    val message = when {
+                        km == null ->
+                            "누적 주행거리: 제공된 값이 없습니다."
+
+                        !km.isFinite() || km < 0f ->
+                            "누적 주행거리: 유효하지 않은 값입니다."
+
+                        else ->
+                            "누적 주행거리: ${
+                                String.format(java.util.Locale.KOREA, "%,.1f", km)
+                            } km"
+                    }
+
+                    Log.i("PleosTest", message)
+                    showMileageResult(message)
+                },
+                onFailed = { error ->
+                    Log.e("PleosTest", "누적 주행거리 조회 실패", error)
+                    showMileageResult(
+                        "주행거리 조회 실패: ${
+                            error.message ?: error.javaClass.simpleName
+                        }"
+                    )
+                }
+            )
+        } catch (error: Exception) {
+            Log.e("PleosTest", "주행거리 연결 또는 요청 실패", error)
+            showMileageResult(
+                "주행거리 연결 또는 요청 실패: ${
+                    error.message ?: error.javaClass.simpleName
+                }"
+            )
+        }
+    }
+
+    private fun showMileageResult(message: String) {
+        runOnUiThread {
+            if (!isDestroyed && !isFinishing) {
+                mileageStatus.value = message
+                isMileageReading.value = false
+            }
+        }
+    }
+
+    private fun savePleosMileage(km: Float) {
+        val queriedAt = System.currentTimeMillis()
+
+        getSharedPreferences("pleos_vehicle_cache", Context.MODE_PRIVATE)
+            .edit()
+            .putFloat("veh_sonata_mileage_km", km)
+            .putLong("veh_sonata_queried_at", queriedAt)
+            .apply()
+
+        viewModel.updatePleosMileage(km, queriedAt)
+    }
+
+    private fun restorePleosMileage() {
+        val prefs = getSharedPreferences(
+            "pleos_vehicle_cache",
+            Context.MODE_PRIVATE
+        )
+
+        if (!prefs.contains("veh_sonata_mileage_km")) return
+
+        val km = prefs.getFloat("veh_sonata_mileage_km", -1f)
+        val queriedAt = prefs.getLong("veh_sonata_queried_at", 0L)
+
+        if (!km.isFinite() || km < 0f ||
+            km.toDouble() > Int.MAX_VALUE.toDouble() ||
+            queriedAt <= 0L
+        ) return
+
+        viewModel.updatePleosMileage(km, queriedAt)
+
+        val formattedKm = String.format(
+            java.util.Locale.KOREA,
+            "%,.1f",
+            km
+        )
+        val formattedTime = java.text.SimpleDateFormat(
+            "yyyy-MM-dd HH:mm:ss",
+            java.util.Locale.KOREA
+        ).format(java.util.Date(queriedAt))
+
+        mileageStatus.value =
+            "저장된 주행거리: $formattedKm km\n마지막 조회: $formattedTime"
+    }
+
+    override fun onStart() {
+        super.onStart()
+        startSpeedUpdates()
+
+        if (mileageUpdatesActive) return
+
+        try {
+            val vehicle = pleosVehicle ?: Vehicle(this).also {
+                pleosVehicle = it
+                it.initialize()
+            }
+
+            mileageUpdatesActive = true
+            vehicle.getOdometer().registerDistanceDriven(mileageListener)
+
+            Log.i("PleosTest", "주행거리 자동 수신 등록 요청")
+
+            // 변경 알림과 별도로, 화면을 열었을 때 현재 값도 조회합니다.
+            readPleosMileage()
+        } catch (e: Exception) {
+            mileageUpdatesActive = false
+            Log.e("PleosTest", "주행거리 자동 수신 등록 실패", e)
+            showMileageResult(
+                "자동 수신 등록 실패: ${e.message ?: e.javaClass.simpleName}"
+            )
+        }
+    }
+
+    override fun onStop() {
+        stopSpeedUpdates()
+        val wasActive = mileageUpdatesActive
+        mileageUpdatesActive = false
+
+        try {
+            if (wasActive) {
+                pleosVehicle?.getOdometer()
+                    ?.unregisterDistanceDriven(mileageListener)
+            }
+        } catch (e: Exception) {
+            Log.e("PleosTest", "주행거리 자동 수신 해제 실패", e)
+        } finally {
+            super.onStop()
+        }
+    }
+
+    override fun onDestroy() {
+        try {
+            pleosVehicle?.release()
+        } finally {
+            pleosVehicle = null
+            super.onDestroy()
         }
     }
 }

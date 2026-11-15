@@ -102,9 +102,56 @@ class CarValueRepository {
     private val _maintenanceRecords = MutableStateFlow<List<MaintenanceRecord>>(getStandardMaintenanceRecords())
     val maintenanceRecords: StateFlow<List<MaintenanceRecord>> = _maintenanceRecords.asStateFlow()
 
+    fun updatePleosMileage(
+        km: Float,
+        queriedAt: Long = System.currentTimeMillis()
+    ) {
+        if (!km.isFinite() || km < 0f ||
+            km.toDouble() > Int.MAX_VALUE.toDouble()
+        ) return
+
+        val linkedVehicleId = "veh_sonata"
+        val mileageKm = km.toInt()
+        val syncTime = java.text.SimpleDateFormat(
+            "yyyy-MM-dd HH:mm:ss",
+            java.util.Locale.KOREA
+        ).format(java.util.Date(queriedAt))
+
+        _garageVehicles.update { vehicles ->
+            vehicles.map { vehicle ->
+                if (vehicle.id == linkedVehicleId) {
+                    vehicle.copy(
+                        currentMileageKm = mileageKm,
+                        sensorConnectionStatus = "누적 주행거리: Pleos 마지막 조회값",
+                        lastSyncTime = syncTime
+                    )
+                } else {
+                    vehicle
+                }
+            }
+        }
+
+        if (_vehicleProfile.value.id == linkedVehicleId) {
+            _vehicleProfile.update {
+                it.copy(
+                    currentMileageKm = mileageKm,
+                    sensorConnectionStatus = "누적 주행거리: Pleos 마지막 조회값",
+                    lastSyncTime = syncTime
+                )
+            }
+            recalculateSchedulesForCondition(
+                _vehicleProfile.value.usageCondition
+            )
+        }
+    }
+
     fun selectGarageVehicle(vehicleId: String) {
-        val target = _garageVehicles.value.firstOrNull { it.id == vehicleId } ?: return
+        val target = _garageVehicles.value.firstOrNull {
+            it.id == vehicleId
+        } ?: return
+
         _vehicleProfile.value = target
+
         if (target.powerTrainType == PowerTrainType.EV) {
             _drivingSessions.value = getEvDrivingSessions()
             _coachingGoals.value = getEvCoachingGoals()
@@ -113,9 +160,12 @@ class CarValueRepository {
         } else {
             _drivingSessions.value = getStandardDrivingSessions()
             _coachingGoals.value = getStandardCoachingGoals()
-            _maintenanceSchedules.value = getStandardMaintenanceSchedules(target.usageCondition)
+            _maintenanceSchedules.value =
+                getStandardMaintenanceSchedules(target.usageCondition)
             _maintenanceRecords.value = getStandardMaintenanceRecords()
         }
+
+        recalculateSchedulesForCondition(target.usageCondition)
     }
 
     fun addGarageVehicle(nickname: String, modelName: String, plateNumber: String, powerTrain: PowerTrainType, driver: String) {

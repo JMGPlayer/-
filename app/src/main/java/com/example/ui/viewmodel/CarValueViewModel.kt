@@ -129,6 +129,13 @@ class CarValueViewModel(
         }
     }
 
+    fun updatePleosMileage(
+        km: Float,
+        queriedAt: Long = System.currentTimeMillis()
+    ) {
+        repository.updatePleosMileage(km, queriedAt)
+    }
+
     fun selectGarageVehicle(vehicleId: String) {
         repository.selectGarageVehicle(vehicleId)
         val selected = repository.vehicleProfile.value
