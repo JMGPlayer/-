@@ -31,6 +31,7 @@ fun SettingsDialog(
     loggedInUserId: String,
     onUpdateSettings: (AppSettings) -> Unit,
     onLogoutClick: () -> Unit,
+    onConnectionCheckClick: () -> Unit,
     onDismiss: () -> Unit
 ) {
     Dialog(
@@ -115,6 +116,35 @@ fun SettingsDialog(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceLight),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceBorder)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "차량 연결 확인",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = PrimaryNavy
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Pleos 데이터 수신 상태와 주행 기록을 확인합니다.",
+                                fontSize = 12.sp,
+                                color = TextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedButton(
+                                onClick = onConnectionCheckClick,
+                                modifier = Modifier.testTag("open_pleos_diagnostics_button")
+                            ) {
+                                Text("연결 확인 열기")
+                            }
+                        }
+                    }
+
                     // 1. Display & Theme (다크 모드)
                     Card(
                         modifier = Modifier.fillMaxWidth(),

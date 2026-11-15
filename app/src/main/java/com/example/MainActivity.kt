@@ -374,6 +374,7 @@ class MainActivity : ComponentActivity() {
         "아직 조회하지 않았습니다."
     )
     private val isReading = androidx.compose.runtime.mutableStateOf(false)
+    private val showPleosDiagnostics = androidx.compose.runtime.mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -384,122 +385,38 @@ class MainActivity : ComponentActivity() {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
             MyApplicationTheme(darkTheme = uiState.appSettings.isDarkMode) {
-                Column(
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .safeDrawingPadding()
                 ) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp)
-                        ) {
-                            Text(
-                                text = "Pleos 연결 테스트",
-                                style = MaterialTheme.typography.titleMedium
-                            )
+                    CarValueCoachApp(
+                        viewModel = viewModel,
+                        onOpenPleosDiagnostics = { showPleosDiagnostics.value = true }
+                    )
 
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = mileageStatus.value,
-                                fontSize = 24.sp
-                            )
-
-                            Button(
-                                onClick = { readPleosMileage() },
-                                enabled = !isMileageReading.value,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 64.dp)
-                            ) {
-                                Text(
-                                    text = if (isMileageReading.value) {
-                                        "주행거리 조회 중…"
-                                    } else {
-                                        "주행거리 다시 읽기"
-                                    },
-                                    fontSize = 22.sp
+                    if (showPleosDiagnostics.value) {
+                        PleosDiagnosticsDialog(
+                            mileageStatus = mileageStatus.value,
+                            isMileageReading = isMileageReading.value,
+                            onReadMileage = ::readPleosMileage,
+                            speedPermissionStatus = speedPermissionStatus.value,
+                            onRequestSpeedPermission = ::requestSpeedPermission,
+                            speedStatus = speedStatus.value,
+                            onStartRecording = ::requestDrivingRecordStart,
+                            onStopRecording = {
+                                startService(
+                                    android.content.Intent(
+                                        this@MainActivity,
+                                        DrivingRecordService::class.java
+                                    ).setAction("STOP_RECORDING")
                                 )
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Text(
-                                text = speedPermissionStatus.value,
-                                fontSize = 20.sp
-                            )
-
-                            Button(
-                                onClick = { requestSpeedPermission() },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 56.dp)
-                            ) {
-                                Text(
-                                    text = "속도 접근 허용",
-                                    fontSize = 22.sp
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = speedStatus.value,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Button(
-                                    onClick = { requestDrivingRecordStart() }
-                                ) {
-                                    Text("기록 시작")
-                                }
-
-                                Button(
-                                    onClick = {
-                                        startService(
-                                            android.content.Intent(
-                                                this@MainActivity,
-                                                DrivingRecordService::class.java
-                                            ).setAction("STOP_RECORDING")
-                                        )
-                                    }
-                                ) {
-                                    Text("기록 종료")
-                                }
-                            }
-
-                            DrivingRecordPanel()
-
-                            Text(text = doorStatus.value)
-
-                            Button(
-                                onClick = { readPleosDoor() },
-                                enabled = !isReading.value
-                            ) {
-                                Text(
-                                    if (isReading.value) "조회 중…"
-                                    else "문 상태 다시 읽기"
-                                )
-                            }
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                    ) {
-                        CarValueCoachApp(viewModel = viewModel)
+                            },
+                            doorStatus = doorStatus.value,
+                            isDoorReading = isReading.value,
+                            onReadDoor = ::readPleosDoor,
+                            onDismiss = { showPleosDiagnostics.value = false }
+                        )
                     }
                 }
             }
@@ -727,7 +644,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun CarValueCoachApp(viewModel: CarValueViewModel) {
+fun CarValueCoachApp(
+    viewModel: CarValueViewModel,
+    onOpenPleosDiagnostics: () -> Unit = {}
+) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val vehicleProfile by viewModel.vehicleProfile.collectAsStateWithLifecycle()
@@ -1066,6 +986,10 @@ fun CarValueCoachApp(viewModel: CarValueViewModel) {
             loggedInUserId = uiState.loggedInUserId,
             onUpdateSettings = updateAndPersistSettings,
             onLogoutClick = { viewModel.logout() },
+            onConnectionCheckClick = {
+                viewModel.setShowSettingsDialog(false)
+                onOpenPleosDiagnostics()
+            },
             onDismiss = { viewModel.setShowSettingsDialog(false) }
         )
     }
